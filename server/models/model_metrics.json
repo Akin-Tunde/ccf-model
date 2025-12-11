@@ -1,0 +1,23 @@
+{
+  "Logistic Regression": {
+    "f1_score": 0.1056,
+    "precision": 0.056,
+    "recall": 0.9184,
+    "auc_roc": 0.9669,
+    "auprc": 0.7153
+  },
+  "Random Forest": {
+    "f1_score": 0.8701,
+    "precision": 0.9747,
+    "recall": 0.7857,
+    "auc_roc": 0.9531,
+    "auprc": 0.8846
+  },
+  "Support Vector Machine": {
+    "f1_score": 0.0081,
+    "precision": 0.0041,
+    "recall": 0.9082,
+    "auc_roc": 0.9245,
+    "auprc": 0.6434
+  }
+}
