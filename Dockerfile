@@ -1,4 +1,4 @@
-# --- File: akin-tunde-ccf-model/Dockerfile (Full FINAL Code) ---
+# --- File: akin-tunde-ccf-model/Dockerfile (Final Working Code) ---
 
 # 1. Base Image: Node image that has Python pre-installed or is easy to install on.
 FROM node:18-bullseye-slim
@@ -41,9 +41,7 @@ COPY . .
 # 8. Run the build step (Vite and Esbuild)
 RUN pnpm build
 
-# --- PRODUCTION CLEANUP (Remove dev-only packages after build is complete) ---
-RUN pnpm prune --prod
-# --- END CLEANUP ---
+# --- No cleanup step, leave node_modules as-is for runtime stability ---
 
 # 9. Set the port (Render default)
 EXPOSE 10000
