@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // --- ABSOLUTE PYTHON PATH CONFIGURATION ---
 // This ensures Node.js uses the Python environment that has the ML libraries installed.
-const PYTHON_EXE_PATH = 'python';
+const PYTHON_EXE_PATH = process.env.PYTHON_EXE_PATH || 'python3' || 'python' || 'python.exe'; 
 // ------------------------------------------
 
 
