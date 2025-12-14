@@ -1,4 +1,4 @@
-# --- File: akin-tunde-ccf-model/Dockerfile (Final Production-Ready Version) ---
+# --- File: akin-tunde-ccf-model/Dockerfile (Full FINAL Code) ---
 
 # 1. Base Image: Node image that has Python pre-installed or is easy to install on.
 FROM node:18-bullseye-slim
@@ -23,6 +23,10 @@ WORKDIR /usr/src/app
 COPY package.json pnpm-lock.yaml ./
 RUN npm install -g pnpm 
 
+# --- CRITICAL FIX: Copy the patches folder before pnpm install runs ---
+COPY patches/ patches/ 
+# ---------------------------------------------------------------------
+
 # --- Build Dependencies Install: Install ALL dependencies to allow the 'build' script to run ---
 RUN pnpm install 
 
@@ -31,19 +35,18 @@ RUN pnpm install
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
-# 7. Copy Source Code (including client/server folders)
+# 7. Copy remaining application code
 COPY . .
 
 # 8. Run the build step (Vite and Esbuild)
 RUN pnpm build
 
-# --- PRODUCTION CLEANUP (CRITICAL for a clean final image) ---
-# 9. Remove development-only packages after the build is complete.
+# --- PRODUCTION CLEANUP (Remove dev-only packages after build is complete) ---
 RUN pnpm prune --prod
 # --- END CLEANUP ---
 
-# 10. Set the port (Render default)
+# 9. Set the port (Render default)
 EXPOSE 10000
 
-# 11. Start the Node.js application 
+# 10. Start the Node.js application 
 CMD ["pnpm", "start"]
