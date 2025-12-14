@@ -1,6 +1,6 @@
 # Credit Card Fraud Detection Application - TODO
 
-## Core Features
+## Core Features h
 
 - [x] Train and save all three ML models (Logistic Regression, Random Forest, SVM) with optimal RFE feature sets
 - [x] Create database schema for model metadata and prediction history
