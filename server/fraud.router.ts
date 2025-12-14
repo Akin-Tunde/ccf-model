@@ -1,10 +1,12 @@
+// --- File: akin-tunde-ccf-model/server/fraud.router.ts (Full Fixed Code) ---
+
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
 import {
   getAvailableModels,
   getFeatureNames,
   getModelMetrics,
-  predictFraud,
+  predictFraud, // <-- Now returns a Promise
 } from "./ml";
 import { getDb } from "./db";
 import { fraudPredictions } from "../drizzle/schema";
@@ -31,8 +33,9 @@ export const fraudRouter = router({
         features: featureInputSchema,
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      const result = predictFraud(input.modelName, input.features);
+    // --- FIX: Add 'async' to the function and 'await' to the call ---
+    .mutation(async ({ input, ctx }) => { 
+      const result = await predictFraud(input.modelName, input.features); 
 
       // Save prediction to database if user is authenticated
       if (ctx.user) {

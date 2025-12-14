@@ -1,8 +1,17 @@
+// --- File: akin-tunde-ccf-model/server/ml.ts (Full Fixed Code) ---
+
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { spawn } from "child_process"; 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// --- ABSOLUTE PYTHON PATH CONFIGURATION ---
+// This ensures Node.js uses the Python environment that has the ML libraries installed.
+const PYTHON_EXE_PATH = 'python';
+// ------------------------------------------
+
 
 interface ModelMetrics {
   f1_score: number;
@@ -26,6 +35,7 @@ export function getModelMetrics(): ModelMetricsData {
       const data = fs.readFileSync(metricsPath, "utf-8");
       modelMetrics = JSON.parse(data);
     } else {
+      // Fallback data (matches your notebook output for RFE 15)
       modelMetrics = {
         "Logistic Regression": {
           f1_score: 0.1056,
@@ -61,6 +71,7 @@ export function getFeatureNames(): string[] {
       const data = fs.readFileSync(featuresPath, "utf-8");
       featureNames = JSON.parse(data);
     } else {
+      // Fallback data (RFE 15 features)
       featureNames = [
         "Time",
         "V1",
@@ -98,59 +109,78 @@ export interface PredictionResult {
 }
 
 /**
- * Mock prediction function - in production, this would load and use actual sklearn models
- * For now, we'll use a simple heuristic based on the features
+ * Executes a Python script to load the trained model and perform prediction.
  */
-export function predictFraud(
+export async function predictFraud(
   modelName: string,
   features: PredictionInput
-): PredictionResult {
-  const metrics = getModelMetrics()[modelName];
-  if (!metrics) {
-    throw new Error(`Model ${modelName} not found`);
-  }
-
-  // Simple heuristic: use a combination of features to make a prediction
-  // In production, this would use the actual trained sklearn models
-  const amount = features.Amount || 0;
-  const time = features.Time || 0;
-  const v1 = features.V1 || 0;
-  const v4 = features.V4 || 0;
-
-  // Calculate a fraud score based on feature values
-  let fraudScore = 0;
-
-  // Heuristic rules based on typical fraud patterns
-  if (amount > 1000) fraudScore += 0.2;
-  if (amount < 10) fraudScore += 0.1;
-  if (Math.abs(v1) > 2) fraudScore += 0.15;
-  if (Math.abs(v4) > 2) fraudScore += 0.15;
-
-  // Model-specific adjustments
-  switch (modelName) {
-    case "Random Forest":
-      fraudScore *= 1.2; // Random Forest tends to be more conservative
-      break;
-    case "Logistic Regression":
-      fraudScore *= 0.8; // Logistic Regression is more aggressive
-      break;
-    case "Support Vector Machine":
-      fraudScore *= 0.9;
-      break;
-  }
-
-  // Ensure score is between 0 and 1
-  fraudScore = Math.min(Math.max(fraudScore, 0), 1);
-
-  // Use model's recall as threshold for prediction
-  const threshold = 1 - metrics.recall;
-
-  const isFraud = fraudScore > threshold;
-  const confidence = Math.round((isFraud ? fraudScore : 1 - fraudScore) * 100);
-
-  return {
-    prediction: isFraud ? "fraud" : "legitimate",
-    confidence,
-    modelName,
+): Promise<PredictionResult> {
+  // 1. Get the list of features in the correct order (RFE 15 features)
+  const featureOrder = getFeatureNames();
+  
+  // 2. Prepare the payload for the Python script
+  const payload = {
+    modelName: modelName,
+    features: features,
+    featureOrder: featureOrder,
   };
+
+  return new Promise((resolve, reject) => {
+    // 3. Spawn the Python process
+    const scriptPath = path.join(__dirname, "models", "predict_model.py");
+    
+    // Use the absolute path provided
+    const pythonProcess = spawn(PYTHON_EXE_PATH, [scriptPath]); 
+
+    let stdoutData = "";
+    let stderrData = "";
+
+    // 4. Send payload to Python via stdin
+    pythonProcess.stdin.write(JSON.stringify(payload));
+    pythonProcess.stdin.end();
+
+    // 5. Collect output and errors
+    pythonProcess.stdout.on("data", (data) => {
+      stdoutData += data.toString();
+    });
+
+    pythonProcess.stderr.on("data", (data) => {
+      stderrData += data.toString();
+    });
+
+    // 6. Handle process exit
+    pythonProcess.on("close", (code) => {
+      if (code !== 0) {
+        console.error(`[ML Bridge] Python script exited with code ${code}. Error: ${stderrData}`);
+        return reject(new Error("Prediction failed: Internal ML service error."));
+      }
+
+      try {
+        const result = JSON.parse(stdoutData);
+        
+        if (result.error) {
+            // Error reported by the Python script itself
+            console.error(`[ML Bridge] Python reported error: ${result.error}`);
+            return reject(new Error(`Prediction failed: ${result.error}`));
+        }
+
+        // Final validation
+        if (typeof result.prediction !== 'string' || typeof result.confidence !== 'number' || result.prediction.length === 0) {
+            throw new Error("Invalid or empty result format from Python script.");
+        }
+
+        resolve(result as PredictionResult);
+
+      } catch (e) {
+        console.error('Failed to parse Python output:', stdoutData, e);
+        reject(new Error('Invalid response format from ML service.'));
+      }
+    });
+
+    pythonProcess.on('error', (err) => {
+        // This catches errors like 'spawn python ENOENT'
+        console.error(`[ML Bridge] Failed to start Python process: ${err.message}`);
+        reject(new Error(`ML Service Unavailable: ${err.message}. Check Python/library setup.`));
+    });
+  });
 }
